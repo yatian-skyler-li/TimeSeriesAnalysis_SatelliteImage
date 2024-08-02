@@ -1,0 +1,371 @@
+---
+title: "Lab 7 - Time Series Analysis in R"
+author: "Skyler Li"
+date: "`r format(Sys.time(), '%d %B %Y')`"
+output:
+  html_document:
+    toc: yes
+    df_print: paged
+  pdf_document:
+    toc: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Project Introduction
+
+
+## Attaching packages
+
+This project requires the following packages to be installed and attached. 
+
+```{r, message=FALSE}
+# Spatial Data
+library(terra)
+library(sf)
+
+# Tidyverse
+library(readr)
+library(stringr)
+library(lubridate)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+
+# BFAST
+library(bfast)
+```
+
+# PART 1 - MODIS NDVI time-series analysis
+
+The first part of this project will focus on an area located in the region of Yellowhead Country, Alberta. A time series of NDVI values from the MOD13Q1 MODIS product will be examinated.
+
+---
+
+This project uses NDVI Data from the MODIS Terra product MOD13Q1. Navigate to the following website to read about the product:
+
+https://lpdaac.usgs.gov/products/mod13q1v006/ 
+
+Here are some key information on the dataset
+- spatial resolution: 250 meter
+- temporal resolution: 16 days
+- temporal availability: 2000-02-18 to 2023-02-17
+- valid range of NDVI values (1st layer in dataset): -2000 to 10000
+
+---
+
+The time series of cleaned MOD13Q1 NDVI layers is located in the `"data/MOD13Q1_TS"` directory. The date of the time series is indicated in the file name a sequence of 7 numbers after the letter `A`. The first four numbers indicate the year and the next three numbers indicate the day of the year. 
+
+First, we are going to find out the range of years covered by the time series, and how many files per year.
+
+---
+
+```{r}
+# list all the tif files
+flist <- list.files("data/MOD13Q1_TS", 
+                    pattern = "tif$", 
+                    full.names = TRUE)
+length(flist)
+# check a few examples in the file list
+flist[1:3]
+
+# extract file name
+fname <- basename(flist)
+# extract date
+fname_date <- str_extract(fname, pattern = "A[0-9]{7}")
+
+# drop "A" for the file names
+date_ts <- str_replace(fname_date, 
+                          pattern = "A", 
+                          replacement = "")
+# change it to Data format, can be combined in one line with previous step
+date_ts <- as_date(date_ts, 
+                    format = "%Y%j")
+
+# create a data frame to get the range of the year and number of files per year
+date_ts_df <- data.frame(date = date_ts)
+summary_df <- date_ts_df %>%
+  mutate(year = year(date)) %>%
+  group_by(year) %>% # range of the year
+  summarize(n_year = n()) # number of files per year
+
+```
+
+---
+
+Then we open the files of `flist` in a `SpatRaster` object called `ndvi_ts` and rename the layers of `ndvi_ts` based on `date_ts`. Calculate  the median NDVI value of each pixel throughout the entire time-series in a `SpatRaster` object called `ndvi_ts_med`. A plot of `ndvi_ts_med` was created.
+
+---
+
+```{r}
+# turn the files we gained into a raster
+ndvi_ts <- rast(flist)
+#rename the layers of `ndvi_ts` based on `date_ts`
+names(ndvi_ts) <- date_ts 
+# apply mdeian function and store the data in ndvi_ts_med
+ndvi_ts_med <- app(ndvi_ts, fun = "median", na.rm = TRUE)
+plot(ndvi_ts_med)
+```
+
+
+---
+
+We are going to focus on two regions of interest (ROIs) located in the study area. The ROIs are stored in the shapefile `MOD13Q1_roi.shp` located in the `data` folder. It uses the same CRS as the MOD13Q1 time series. The `MOD13Q1_roi.shp` has a field called `ID` with the value `A` for the first ROI and `B` for the second `ROI`. 
+
+Extract the average NDVI value of each ROI for each layer of `ndvi_ts` time series into a `data.frame` named `ndvi_roi`. Transform  `ndvi_roi` to a data.frame in a "long" format (one column storing the layer names and another one storing NDVI) named `ndvi_roi_long`.
+
+Using `ndvi_roi_long` and `dplyr` functions, calculate the monthly NDVI average of the months between May and September from the first year of the time series to `2006` for both ROIs combined. The summary was stored in an object called `ndvi_roi_summary`
+
+--- 
+
+```{r}
+# read the shapefile containing the Regions of Interest (ROIs)
+ROIs <- read_sf("data/roi_MOD13Q1.shp")
+
+# extract mean NDVI values for each ROI from the NDVI time series data
+ndvi_roi <- terra::extract(ndvi_ts, vect(ROIs), fun = mean, na.rm = TRUE)
+
+# reshape the extracted NDVI data from wide format to long format
+ndvi_roi_long <- ndvi_roi %>% 
+  pivot_longer(
+    cols = starts_with("2"),
+    names_to = "layer_names", 
+    values_to = "ndvi"
+  )
+
+# Summarize the NDVI data
+ndvi_roi_summary <- ndvi_roi_long %>% 
+  mutate(,month = month(ndvi_roi_long$"layer names"),year = year(ndvi_roi_long$"layer names")) %>% 
+  filter(year<2006 & month>=5 &month<=9) %>% 
+  group_by(month) %>% 
+  summarise(ndvi_month = mean(ndvi, na.rm = TRUE))
+
+# Display the summarized data
+print(ndvi_roi_summary)
+```
+
+---
+
+Using `ggplot2` and `ndvi_roi_summary`, make a connected scatter plot (points connected with a line) showing the monthly NDVI average on the y-axis and the month on the x-axis. 
+
+---
+
+```{r}
+# use the month as the factor in the ndvi_roi_summary data frame
+month_unique<-unique(ndvi_roi_summary$month)
+ndvi_roi_summary$month <- factor(ndvi_roi_summary$month,
+                                  levels =month_unique,
+                                  ordered = TRUE)
+# Plot the monthly NDVI average on the y-axis and the month on the x-axis
+ggplot(data = ndvi_roi_summary, aes(x = month, y = ndvi_month,group=1))+
+   geom_point() +
+  geom_line()+
+  theme_bw() +
+  labs(title = "Scatter Plot of Month VS. monthly NDVI average",
+       x = "Month",
+       y = "NDVI average")
+```
+
+
+---
+
+We are now going to apply the BFAST change detection algorithm at the two ROIs located in the study area. 
+
+Filter the object `ndvi_roi_long` to create two data.frame `ndvi_roi_A` and `ndvi_roi_B` with the NDVI time series at the ROI A and ROI B, respectively.  Convert `ndvi_roi_A` and `ndvi_roi_B` to a `time-series` object with the function `ts(data = ..., frequency = ..., start = c(..., ...))`. The `frequency` of the time series is equal to the number of NDVI layers per year and the time series starts on the first observation of the first year in the time series.
+
+Run the BFAST algorithm for both ROIs using `bfastmonitor()`. For ROI A, start the monitoring period on the first observation of 2008 (`start = c(2008,1)`). For ROI B, start the monitoring period on the first observation of 2006 (`start = c(2006,1)`)
+
+BFAST detects a deviation from the expected NDVI pattern for ROI A is on July 26th, 2011. For ROI B, it's on May 23rd, 2008. 
+
+The cause of the break at the POI for ROI A could be logging since the NDVI value has no obvious trend to recover after returning to the original stage and keeps relatively stable. Natural disturbances like wildfire could be the cast of the break in ROI B since the NDVI value seems to  recover to the original stage, which shows a graduate recovery process of the ecosystem. 
+
+---
+
+```{r}
+ndvi_roi_A <- data.frame(ndvi_roi_long %>% 
+  filter(ID == "1"))
+
+ndvi_roi_A <-ts(ndvi_roi_A$ndvi,
+     frequency = 23,
+     start = c(2001,1))
+
+ndvi_roi_B <- data.frame(ndvi_roi_long %>% 
+  filter(ID == "2"))
+
+ndvi_roi_B <-ts(ndvi_roi_B$ndvi,
+     frequency = 23,
+     start = c(2001,1))
+
+monitor_A <- bfastmonitor(ndvi_roi_A, start = c(2008, 1))
+monitor_B <- bfastmonitor(ndvi_roi_B, start = c(2006, 1))
+plot(monitor_A)
+plot(monitor_B)
+
+monitor_A$breakpoint
+monitor_B$breakpoint
+monitor_A$magnitude
+monitor_B$magnitude
+```
+
+---
+
+# PART 2 - Land cover time series analysis
+
+In the second part of this project we are going to analyze a 33-year time series of land cover maps classified from Landsat imagery. The classification was performed using the Virtual Land Cover Engine (VLCE; [Hermosilla et al., 2017](https://www.tandfonline.com/doi/full/10.1080/07038992.2018.1437719)). 
+
+The VLCE classifies land cover into the following classes: 
+
+- Water (class 20)
+- Snow/Ice (class 31)
+- Rock/Rubble (class 32)
+- Exposed/Barren Land (class 33)
+- Bryoids (class 40)
+- Shrubland (class 50)
+- Wetland (class 80)
+- Wetland-Treed (class 81)
+- Herbs (class 100)
+- Coniferous (class 210)
+- Broadleaf (class 220)
+- Mixed Wood (class 230)
+
+We are going to focus on a ~ 25 x 20 km area near Williams Lake, BC where active forest management practices take place. The aim of the lab is to examine the evolution of total forested area through time in this area as a balance between forest area loss (e.g. harvesting) and gain (e.g. forest regeneration). 
+
+---
+
+The folder `VLCE_TS` contains the time series of VLCE land cover maps for the study area.
+
+List all the full path of the tif files in a vector of characters called `flist_vlce`. Extract the year from each element of `flist_vlce` into a vector called `year_ts`. 
+
+---
+
+```{r}
+flist_vlce <- list.files("data/VLCE_TS", pattern = "tif$",full.names = TRUE)
+year_ts <- str_extract(basename(flist_vlce), pattern = "[0-9]{4}")
+```
+
+---
+
+Open all of the files listed in `flist_vlce` in a single `SpatRaster` object called `vlce_ts`. Rename the layers of `vlce_ts` based on their corresponding year in the time series. Plot the first and last image of the time series side by side.
+
+---
+
+```{r}
+vlce_ts <- rast(flist_vlce)
+names(vlce_ts) <- year_ts
+
+par(mfrow=c(1,2))
+plot(vlce_ts$'1984',main = '1984')
+plot(vlce_ts$'2016',main = '2016')
+```
+
+---
+
+In the following steps we are going to focus on the gain and loss in forested areas over time. Therefore, we are going to reclassify the land cover time series into forested and non-forested land cover. 
+
+The text file `lc_reclassification.csv` lists all the possible land cover types classified by the VLCE, the original value assigned to each class and the new value each class should get to obtain a binary forested / non-forested classification. The classes `Coniferous`, `Broadleaf`, `Mixed woods` and `Wetland-Treed` are considered as forested areas (class `1`) while all other classes (expect `Unclassifed`) are considered as non-forested areas (class `0`) 
+
+Use the `terra::classify` function to reclassify `vlce_ts` into a binary forested / non-forested `Spatraster` called `ts_forested`.
+
+Correctly input the reclassification matrix into the classify function; see ?terra::classify for details. 
+---
+
+```{r}
+lc_reclassification <- read.csv("data/lc_reclassification.csv")
+lc_reclassification$new_value <- as.numeric(lc_reclassification$new_value)
+lc_reclassification <-lc_reclassification[, -1]
+ts_forested <- terra::classify(vlce_ts,lc_reclassification)
+```
+
+
+---
+
+Use the `terra::diff` function with a lag of 1 year to compute the `SpatRaster` object called `ts_forested_lag`. The layer of `ts_forested_lag` at year `t` is the result of `ts_forested[[t]] - ts_forested[[t - 1]]`. Note that the first year of the time series (i.e. 1984) is lost in the lagged difference computation. 
+
+---
+
+```{r}
+ts_forested_lag <- diff(ts_forested, lag = 1)
+```
+
+---
+
+Calculate the total forest area gained and the total forest areas lost for each year between 1985 and 2016, ***in hectares***. Store this information in two data frames called `forest_gain` and `forest_loss`. Each data frame should have 2 columns: `year` and either `gain` or `loss`. Then, join the two data frames `forest_gain` and `forest_loss` into a single data frame `forest_change`. 
+
+Finally, add a column `net_change` equal to the difference between forest gain and forest loss to the data frame `forest_change`. 
+
+---
+
+```{r}
+# convert the time series matrix ts_forested_lag to a data frame and reshape the data frame to long format
+ts_forested_lag_df <- data.frame(ts_forested_lag)
+ts_forested_long <- ts_forested_lag_df %>% 
+  pivot_longer(cols =  1:ncol(ts_forested_lag_df),
+               names_to = "year",
+               values_to = "value")
+
+# calculate forest gain and loss
+forest_gain <- ts_forested_long%>% 
+  group_by(year) %>% 
+  filter(value == "1") %>% 
+  summarise(gain = n()) %>% 
+  mutate(gain = gain*0.09)
+forest_loss <- ts_forested_long%>% 
+  group_by(year) %>% 
+  filter(value == "-1") %>% 
+  summarise(loss= n()) %>% 
+  mutate(loss = loss*0.09)
+
+# combine the forest gain and forest loss data frames by year to get net forest change
+forest_change <- inner_join(forest_gain,forest_loss, by = "year")
+forest_change <- forest_change %>% 
+  mutate(net_change = forest_change$gain -forest_change$loss)
+```
+
+
+---
+
+Use `ggplot2` to  show the net change in forested area over time.
+
+```{r}
+# add a new column to for time line in x aes
+forest_change$year <- as.Date(forest_change$year, "%Y")
+
+ggplot(data = forest_change, aes(x = year, y = net_change))+
+   geom_point() +
+  geom_line()+
+  geom_abline(slope = 0, intercept = 0, linetype = "dashed")+
+  scale_x_date(date_breaks = "1 year", date_labels = "%Y") +
+  theme_bw() +
+  labs(title = "Yearly net forst area change",
+       x = "Year",
+       y = "Change in forested area (ha)")
+```
+
+---
+
+Use `ggplot2` to show the forested area gain and loss over time (colored bars).
+
+---
+
+```{r}
+# create a new data frame to store forest loss and gain information (Forest Dynamics)
+forest_change_types <- forest_change %>%
+  rename(loss_old = loss) %>% 
+  mutate(loss = loss_old*-1) %>% 
+  pivot_longer(cols = c(gain, loss), 
+               names_to = "ForestDynamics", 
+               values_to = "value") 
+
+
+ggplot(data = forest_change_types, aes(x = year, y = value, fill = ForestDynamics))+
+  geom_bar(stat = "identity", position = "dodge")+
+  scale_x_date(date_breaks = "1 year", date_labels = "%Y")+
+  theme_bw() +
+  labs(title = "Yearly net forst area change",
+       x = "year",
+       y = "change in forested area (ha)",
+       fill = "Forest Dynamics")
+```
+
