@@ -3,20 +3,20 @@ This project examined a time series of Normalized Difference Vegetation Index (N
 
 ## Packages used in this project
 - Spatial Data Analysis
-  library(terra)
-  library(sf)
+  - library(terra)
+  - library(sf)
   
 - Tidyverse Packages used for Data Frame Management and Visualization
-  library(readr)
-  library(stringr)
-  library(lubridate)
-  library(dplyr)
-  library(tidyr)
-  library(ggplot2)
+  - library(readr)
+  - library(stringr)
+  - library(lubridate)
+  - library(dplyr)
+  - library(tidyr)
+  - library(ggplot2)
 
 - Algorithm for time series analysis
-  library(bfast)
-  The Breaks for Additive Season and Trend (BFAST) algorithm has been developed to identify long term trends and abrupt changes (breaks) in time series while explicitly accounting for the seasonal component (Verbesselt et al., 2010).
+  - library(bfast)
+  - The Breaks for Additive Season and Trend (BFAST) algorithm has been developed to identify long term trends and abrupt changes (breaks) in time series while explicitly accounting for the seasonal component (Verbesselt et al., 2010).
 
 ## MODIS time series analysis
 This project uses NDVI Data from the MODIS Terra product MOD13Q1. Feel free to navigate to the following website to read about the product: https://lpdaac.usgs.gov/products/mod13q1v006/ 
@@ -28,6 +28,8 @@ Here are some key information on the MODIS Terra dataset
 - valid range of NDVI values (1st layer in dataset): -2000 to 10000
 
 The time series of cleaned MOD13Q1 NDVI layers is located in the "data/MOD13Q1_TS" directory. The date of the time series is indicated in the file name a sequence of 7 numbers after the letter `A`. The first four numbers indicate the year and the next three numbers indicate the day of the year. 
+
+We are going to focus on two regions of interest (ROIs) located in the study area. The ROIs are stored in the shapefile `MOD13Q1_roi.shp` located in the `data` folder. Open the shapefile. It uses the same CRS as the MOD13Q1 time series. The `MOD13Q1_roi.shp` has a field called `ID` with the value `A` for the first ROI and `B` for the second `ROI`. 
 
 ## Land cover time series analysis
 The land cover maps classified from Landsat imagery was also used in this project. The classification was performed using the Virtual Land Cover Engine (VLCE; [Hermosilla et al., 2017](https://www.tandfonline.com/doi/full/10.1080/07038992.2018.1437719)). 
@@ -45,6 +47,8 @@ The VLCE classifies land cover into the following classes:
 - Coniferous (class 210)
 - Broadleaf (class 220)
 - Mixed Wood (class 230)
+
+The text file `lc_reclassification.csv` lists all the possible land cover types classified by the VLCE, the original value assigned to each class and the new value each class should get to obtain a binary forested / non-forested classification. The classes `Coniferous`, `Broadleaf`, `Mixed woods` and `Wetland-Treed` are considered as forested areas (class `1`) while all other classes (expect `Unclassifed`) are considered as non-forested areas (class `0`) 
 
 The folder "data/VLCE_TS" contains the time series of VLCE land cover maps for the study area. This project focused on a ~ 25 x 20 km area near Williams Lake, BC where active forest management practices take place. The aim of the lab is to examine the evolution of total forested area through time in this area as a balance between forest area loss (e.g. harvesting) and gain (e.g. forest regeneration). 
 
