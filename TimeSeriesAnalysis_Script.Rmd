@@ -1,5 +1,5 @@
 ---
-title: "Lab 7 - Time Series Analysis in R"
+title: "Time Series Analysis and Land Cover Change Detection in R"
 author: "Skyler Li"
 date: "`r format(Sys.time(), '%d %B %Y')`"
 output:
@@ -13,9 +13,6 @@ output:
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
-
-# Project Introduction
-
 
 ## Attaching packages
 
@@ -357,7 +354,6 @@ forest_change_types <- forest_change %>%
   pivot_longer(cols = c(gain, loss), 
                names_to = "ForestDynamics", 
                values_to = "value") 
-
 
 ggplot(data = forest_change_types, aes(x = year, y = value, fill = ForestDynamics))+
   geom_bar(stat = "identity", position = "dodge")+
