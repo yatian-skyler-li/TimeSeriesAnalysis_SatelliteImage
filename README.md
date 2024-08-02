@@ -3,20 +3,20 @@ This project examined a time series of Normalized Difference Vegetation Index (N
 
 ## Packages used in this project
 - Spatial Data Analysis
-  library(terra)
-  library(sf)
+  - library(terra)
+  - library(sf)
   
 - Tidyverse Packages used for Data Frame Management and Visualization
-  library(readr)
-  library(stringr)
-  library(lubridate)
-  library(dplyr)
-  library(tidyr)
-  library(ggplot2)
+  - library(readr)
+  - library(stringr)
+  - library(lubridate)
+  - library(dplyr)
+  - library(tidyr)
+  - library(ggplot2)
 
 - Algorithm for time series analysis
-  library(bfast)
-  The Breaks for Additive Season and Trend (BFAST) algorithm has been developed to identify long term trends and abrupt changes (breaks) in time series while explicitly accounting for the seasonal component (Verbesselt et al., 2010).
+  - library(bfast)
+  - The Breaks for Additive Season and Trend (BFAST) algorithm has been developed to identify long term trends and abrupt changes (breaks) in time series while explicitly accounting for the seasonal component (Verbesselt et al., 2010).
 
 ## MODIS time series analysis
 This project uses NDVI Data from the MODIS Terra product MOD13Q1. Feel free to navigate to the following website to read about the product: https://lpdaac.usgs.gov/products/mod13q1v006/ 
